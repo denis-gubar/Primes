@@ -127,9 +127,7 @@ namespace PrimeNumbers
                 return;
             }
 
-            //handle packetString
-            //TODO:
-
+            //Continue serving other commands
             readPacket();
         }
         void queueMessage( string message )

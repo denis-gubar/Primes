@@ -56,7 +56,6 @@ namespace PrimeNumbers
                         for (Int x = Int(3) * k; x <= sqrt_n; x += Int(2) * k)
                             isPrime[static_cast<size_t>(x)] = char(0);
                 }
-                THREAD_COUNT = 1;
                 //Skip reading even numbers
                 for (Int k = Int(3); k <= sqrt_n; k += Int(2))
                     if (isPrime[static_cast<size_t>(k)])
