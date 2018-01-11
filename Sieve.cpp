@@ -119,7 +119,6 @@ namespace PrimeNumbers
             Int calculatedN;
             int THREAD_COUNT;
             RWLock lock;
-        public:
             void basicSieve( Int n )
             {
                 lock.writeLock();
