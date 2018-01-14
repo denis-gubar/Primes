@@ -46,54 +46,13 @@ namespace PrimeNumbers
                 clear();                
                 Int sqrt_n = static_cast<Int>(sqrt( n ));
                 isPrime = vector<char>( static_cast<size_t>(n + Int(1)), char(1) );
-                primes = { Int(2) };
                 //First sqrt(n) numbers are being sieved
-                //Skip reading even numbers
-                for (Int k = Int(3); k <= sqrt_n; k += Int(2))
-                {
-                    if (isPrime[static_cast<size_t>(k)] )
-                        //Skip reading even numbers
-                        for (Int x = Int(3) * k; x <= sqrt_n; x += Int(2) * k)
-                            isPrime[static_cast<size_t>(x)] = char(0);
-                }
-                //Skip reading even numbers
-                for (Int k = Int(3); k <= sqrt_n; k += Int(2))
-                    if (isPrime[static_cast<size_t>(k)])
-                        primes.push_back( k );
-                //SKip reading even numbers
-                Int begin = (sqrt_n + Int(1)) / Int(2) * Int(2) + Int(1), end = n;
-                Int pageSize = (end - begin) / THREAD_COUNT, shift = (end - begin) % THREAD_COUNT;
-                Int pageBegin = begin + shift;
-                vector<thread> workerThreads;
-                auto markCompoundNumbers = [&]( Int begin, Int end ) -> void
-                                {
-                                    //Skip prime number 2
-                                    for (size_t i = 1; i < primes.size(); ++i)
-                                    {
-                                        //Skip reading even numbers
-                                        //Processing only [begin; end] interval
-                                        for (Int k = (begin + primes[i] - Int( 1 )) / (Int( 2 ) * primes[i]) * Int( 2 ) * primes[i] + primes[i];
-                                              k <= end; k += Int( 2 ) * primes[i])
-                                            isPrime[static_cast<size_t>(k)] = char( 0 );
-                                    }
-                                };
-                workerThreads.emplace_back( markCompoundNumbers, begin, pageBegin + pageSize);
-                for (int pageNumber = 1; pageNumber < THREAD_COUNT; ++pageNumber)
-                {
-                    //this_thread::sleep_for( 0.1s );
-                    pageBegin += pageSize;
-                    workerThreads.emplace_back( markCompoundNumbers, pageBegin + Int(1), pageBegin + pageSize );
-                }
-                for (auto& workerThread : workerThreads)
-                    if ( workerThread.joinable() )
-                        workerThread.join();
-                //Skip reading even numbers
-                for (Int k = (sqrt_n + Int(1)) / Int(2) * Int(2) + Int(1) ; k <= n; k += Int(2))
-                    if (isPrime[static_cast<size_t>(k)])
-                        primes.push_back( k );
+                basicSieve( sqrt_n, true );
+                //[sqrt + 1; n] interval is split on THREAD_COUNT parts and processed in parallel
+                parallelSieve( sqrt_n, n );
                 calculatedN = n;
                 lock.writeUnlock();
-            }
+            }            
             void readLock()
             {
                 lock.readLock();
@@ -119,12 +78,15 @@ namespace PrimeNumbers
             Int calculatedN;
             int THREAD_COUNT;
             RWLock lock;
-            void basicSieve( Int n )
+            void basicSieve( Int n, bool reuseStorage = false )
             {
-                lock.writeLock();
-                clear();
                 Int sqrt_n = static_cast<Int>(sqrt( n ));
-                isPrime = vector<char>( static_cast<size_t>(n + 1), static_cast<char>(1) );
+                if (!reuseStorage)
+                {
+                    lock.writeLock();
+                    clear();
+                    isPrime = vector<char>( static_cast<size_t>(n + 1), static_cast<char>(1) );
+                }
                 //Skip reading even numbers
                 for (Int k = Int(3); k <= sqrt_n; k += Int(2))
                 {
@@ -134,13 +96,49 @@ namespace PrimeNumbers
                             isPrime[static_cast<size_t>(x)] = char(0);
                     }
                 }
-                primes.push_back( Int(2) );
+                primes = { Int( 2 ) };
                 //Skip reading even numbers
                 for (Int i = Int(3); i <= n; i += Int(2))
                     if (isPrime[static_cast<size_t>(i)])
-                        primes.push_back( i );
-                calculatedN = n;
-                lock.writeUnlock();
+                        primes.push_back( i );                
+                if (!reuseStorage)
+                {
+                    calculatedN = n;
+                    lock.writeUnlock();
+                }            
+            }
+            void parallelSieve( const Int &sqrt_n, const Int &n )
+            {
+                //SKip reading even numbers
+                Int begin = (sqrt_n + Int( 1 )) / Int( 2 ) * Int( 2 ) + Int( 1 ), end = n;
+                Int pageSize = (end - begin) / THREAD_COUNT, shift = (end - begin) % THREAD_COUNT;
+                Int pageBegin = begin + shift;
+                vector<thread> workerThreads;
+                auto markCompoundNumbers = [&]( Int begin, Int end ) -> void
+                {
+                    //Skip prime number 2
+                    for (size_t i = 1; i < primes.size(); ++i)
+                    {
+                        //Skip reading even numbers
+                        //Processing only [begin; end] interval
+                        for (Int k = (begin + primes[i] - Int( 1 )) / (Int( 2 ) * primes[i]) * Int( 2 ) * primes[i] + primes[i];
+                              k <= end; k += Int( 2 ) * primes[i])
+                            isPrime[static_cast<size_t>(k)] = char( 0 );
+                    }
+                };
+                workerThreads.emplace_back( markCompoundNumbers, begin, pageBegin + pageSize );
+                for (int pageNumber = 1; pageNumber < THREAD_COUNT; ++pageNumber)
+                {
+                    pageBegin += pageSize;
+                    workerThreads.emplace_back( markCompoundNumbers, pageBegin + Int( 1 ), pageBegin + pageSize );
+                }
+                for (auto& workerThread : workerThreads)
+                    if (workerThread.joinable())
+                        workerThread.join();
+                //Skip reading even numbers
+                for (Int k = (sqrt_n + Int( 1 )) / Int( 2 ) * Int( 2 ) + Int( 1 ); k <= n; k += Int( 2 ))
+                    if (isPrime[static_cast<size_t>(k)])
+                        primes.push_back( k );
             }
         public: //For better error message about deleted special methods
             Sieve( const Sieve& ) = delete;

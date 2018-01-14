@@ -163,9 +163,10 @@
     <ClCompile Include="RWLock.cpp" />
     <ClCompile Include="Sieve.cpp" />
     <ClCompile Include="SyncOutput.cpp" />
-    <ClCompile Include="test.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="AsioClient.h" />
+    <ClInclude Include="AsioHandler.h" />
     <ClInclude Include="ClientSession.h" />
     <ClInclude Include="configuration.h" />
     <ClInclude Include="RWLock.h" />
